@@ -29,7 +29,7 @@ Parser.prototype.init = function (config) {
   var pages = this.getPageFiles()
   pages.forEach(function (page) {
     var template = handlebars.compile(fs.readFileSync(path.join(this.config.pagesDir, page), 'utf8'))
-    this.pages[page] = template(this.gameData)
+    this.pages[page] = this.config.header + template(this.gameData) + this.config.footer
   }.bind(this))
 }
 
