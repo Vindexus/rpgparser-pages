@@ -33,6 +33,18 @@ Parser.prototype.getPageFiles = function () {
   return files
 }
 
+Parser.prototype.registerHelpers = function () {
+  if(this.config.helperFiles) {
+    this.config.helperFiles.forEach(function (file) {
+      this.registerHelperFile(file)
+    }.bind(this))
+  }
+}
+
+Parser.prototype.registerHelperFile = function (file) {
+  require(file)(handlebars, this.gameData)
+}
+
 Parser.prototype.registerStep = function (fn, config) {
   this.steps.push({
     fn: fn,
@@ -74,6 +86,7 @@ Parser.prototype.init = function (config) {
   this.pagesDir = this.gameDataDir
   this.pages = {}
   this.gameData = JSON.parse(fs.readFileSync(this.config.gameDataFile))
+  this.registerHelpers()
   this.registerPartials()
   var pages = this.getPageFiles()
   pages.forEach(function (page) {
