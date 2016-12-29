@@ -4,7 +4,7 @@ var _             = require('lodash')
 var handlebars    = require('handlebars')
 
 var Parser = function () {
-  this.config = {
+  this.defaultConfig = {
     debug: false,
     partialsDir: false,
     pagesOnly: false,
@@ -22,10 +22,8 @@ Parser.prototype.log = function() {
 
 Parser.prototype.getPageFiles = function () {
   var readDir = fs.readdirSync(this.config.pagesDir)
-  console.log('this.config.pagesOnly', this.config.pagesOnly)
   var files = readDir.filter(function (file) {
     var filename = path.basename(file)
-    console.log('filename', filename)
     if(!this.config.pagesOnly || this.config.pagesOnly.indexOf(filename) >= 0) {
       return true
     }
@@ -69,6 +67,7 @@ Parser.prototype.registerPartials = function () {
 }
 
 Parser.prototype.init = function (config) {
+  this.config = JSON.parse(JSON.stringify(this.defaultConfig))
   for(var k in config) {
     this.config[k] = config[k]
   }
@@ -111,4 +110,4 @@ Parser.prototype.run = function () {
   }
 }
 
-module.exports = new Parser()
+module.exports = Parser
