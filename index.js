@@ -6,7 +6,10 @@ var handlebars    = require('handlebars')
 var Parser = function () {
   this.config = {
     debug: false,
-    partialsDir: false
+    partialsDir: false,
+    pagesOnly: false,
+    header: '',
+    footer: ''
   }
   this.steps = []
 }
@@ -18,11 +21,32 @@ Parser.prototype.log = function() {
 }
 
 Parser.prototype.getPageFiles = function () {
-  return fs.readdirSync(this.config.pagesDir)
+  var readDir = fs.readdirSync(this.config.pagesDir)
+  console.log('this.config.pagesOnly', this.config.pagesOnly)
+  var files = readDir.filter(function (file) {
+    var filename = path.basename(file)
+    console.log('filename', filename)
+    if(!this.config.pagesOnly || this.config.pagesOnly.indexOf(filename) >= 0) {
+      return true
+    }
+    return false
+  }.bind(this))
+
+  return files
 }
 
-Parser.prototype.registerStep = function (fn) {
-  this.steps.push(fn)
+Parser.prototype.registerStep = function (fn, config) {
+  this.steps.push({
+    fn: fn,
+    config: config
+  })
+}
+
+Parser.prototype.registerPackagedStep = function (stepName, config) {
+  this.steps.push({
+    fn: require('./steps/' + stepName),
+    config: config
+  })
 }
 
 Parser.prototype.getPartialFiles = function () {
@@ -34,7 +58,6 @@ Parser.prototype.getPartialFiles = function () {
 
 Parser.prototype.registerPartials = function () {
   var files = this.getPartialFiles()
-  console.log('FILES FILES FILES', files)
   if(!files) {
     return false
   }
@@ -57,7 +80,24 @@ Parser.prototype.init = function (config) {
   pages.forEach(function (page) {
     var template = handlebars.compile(fs.readFileSync(path.join(this.config.pagesDir, page), 'utf8'))
     var template2 = handlebars.compile(template(this.gameData))
-    this.pages[page] = this.config.header + template2(this.gameData) + this.config.footer
+    this.pages[page] = template2(this.gameData)
+  }.bind(this))
+}
+
+//Runs a registered step, and continues to the next if it exits
+//When it's done with the last step it runs the doneSteps callback function
+Parser.prototype.runStep = function (i, name, filename, doneSteps) {
+  if(!this.steps[i]) {
+    doneSteps(name, filename)
+  }
+  this.steps[i].fn(this.pages[name], name, this.steps[i].config, function (content) {
+    this.pages[name] = content
+    if(i < this.steps.length - 1) {
+      this.runStep(i+1, name, filename, doneSteps)
+    }
+    else {
+      doneSteps(name, filename)
+    }
   }.bind(this))
 }
 
@@ -65,10 +105,9 @@ Parser.prototype.run = function () {
   for(var name in this.pages) {
     var basename = path.basename(name, path.extname(name))
     var filename =  basename + '.' + this.config.outputExtension
-    for(var i = 0; i < this.steps.length; i++) {
-      this.pages[name] = this.steps[i](this.pages[name], name)
-    }
-    fs.writeFileSync(path.join(this.config.outputDir, filename), this.pages[name])
+    this.runStep(0, name, filename, function (name, filename) {
+      fs.writeFileSync(path.join(this.config.outputDir, filename), this.config.header + this.pages[name] + this.config.footer)
+    }.bind(this))
   }
 }
 
