@@ -39,6 +39,14 @@ module.exports = function (content, name, config, done) {
         }
         var newNodeName = config.nodesToNodes.hasOwnProperty(nodeName) ? config.nodesToNodes[nodeName] : 'div'
         var newNode = window.document.createElement(newNodeName)
+
+        $.each(elem.attributes, function() {
+          console.log(this.name, this.value);
+          if(this.value !== undefined) {
+            $(newNode).attr(this.name, this.value)
+          }
+        });
+
         $(newNode).addClass(nodeName)
         $(newNode).html($(elem)[0].innerHTML)
         var replace = $(newNode)[0].outerHTML

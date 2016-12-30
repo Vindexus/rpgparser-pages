@@ -9,9 +9,11 @@ var Parser = function () {
     partialsDir: false,
     pagesOnly: false,
     header: '',
-    footer: ''
+    footer: '',
+    helpers: []
   }
   this.steps = []
+  this.helpers = []
 }
 
 Parser.prototype.log = function() {
@@ -33,10 +35,21 @@ Parser.prototype.getPageFiles = function () {
   return files
 }
 
+Parser.prototype.registerHelper = function (fn) {
+  console.log('here we go')
+  this.helpers.push(fn)
+}
+
 Parser.prototype.registerHelpers = function () {
   if(this.config.helperFiles) {
     this.config.helperFiles.forEach(function (file) {
       this.registerHelperFile(file)
+    }.bind(this))
+  }
+  console.log('NUM HELPERS' + this.helpers.length)
+  if(this.helpers) {
+    this.helpers.forEach(function (helper) {
+      helper(handlebars, this.gameData)
     }.bind(this))
   }
 }
@@ -86,14 +99,6 @@ Parser.prototype.init = function (config) {
   this.pagesDir = this.gameDataDir
   this.pages = {}
   this.gameData = JSON.parse(fs.readFileSync(this.config.gameDataFile))
-  this.registerHelpers()
-  this.registerPartials()
-  var pages = this.getPageFiles()
-  pages.forEach(function (page) {
-    var template = handlebars.compile(fs.readFileSync(path.join(this.config.pagesDir, page), 'utf8'))
-    var template2 = handlebars.compile(template(this.gameData))
-    this.pages[page] = template2(this.gameData)
-  }.bind(this))
 }
 
 //Runs a registered step, and continues to the next if it exits
@@ -114,6 +119,14 @@ Parser.prototype.runStep = function (i, name, filename, doneSteps) {
 }
 
 Parser.prototype.run = function () {
+  this.registerHelpers()
+  this.registerPartials()
+  var pages = this.getPageFiles()
+  pages.forEach(function (page) {
+    var template = handlebars.compile(fs.readFileSync(path.join(this.config.pagesDir, page), 'utf8'))
+    var template2 = handlebars.compile(template(this.gameData))
+    this.pages[page] = template2(this.gameData)
+  }.bind(this))
   for(var name in this.pages) {
     var basename = path.basename(name, path.extname(name))
     var filename =  basename + '.' + this.config.outputExtension
