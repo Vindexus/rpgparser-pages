@@ -65,6 +65,7 @@ module.exports = function (content, name, config, done) {
         }
       })
 
+      $('head').remove()
       var html = $('html')[0].innerHTML
       done(html)
     }

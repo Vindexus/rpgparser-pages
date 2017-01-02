@@ -2,6 +2,7 @@ var path          = require('path')
 var fs            = require('fs')
 var _             = require('lodash')
 var handlebars    = require('handlebars')
+var minimist      = require('minimist');
 
 var Parser = function () {
   this.defaultConfig = {
@@ -99,6 +100,16 @@ Parser.prototype.init = function (config) {
   this.gameData = JSON.parse(fs.readFileSync(this.config.gameDataFile))
 }
 
+Parser.prototype.processArgv = function () {
+  var args = minimist(process.argv.slice(2))
+  if(args.files) {
+    this.config.pagesOnly = args.files.split(",")
+  }
+  if(args.debug) {
+    this.config.debug = parseInt(args.debug) == 1
+  }
+}
+
 //Runs a registered step, and continues to the next if it exits
 //When it's done with the last step it runs the doneSteps callback function
 Parser.prototype.runStep = function (i, name, filename, doneSteps) {
@@ -117,6 +128,7 @@ Parser.prototype.runStep = function (i, name, filename, doneSteps) {
 }
 
 Parser.prototype.run = function () {
+  this.processArgv()
   this.registerHelpers()
   this.registerPartials()
   var pages = this.getPageFiles()
