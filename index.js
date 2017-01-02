@@ -36,7 +36,6 @@ Parser.prototype.getPageFiles = function () {
 }
 
 Parser.prototype.registerHelper = function (fn) {
-  console.log('here we go')
   this.helpers.push(fn)
 }
 
@@ -46,7 +45,6 @@ Parser.prototype.registerHelpers = function () {
       this.registerHelperFile(file)
     }.bind(this))
   }
-  console.log('NUM HELPERS' + this.helpers.length)
   if(this.helpers) {
     this.helpers.forEach(function (helper) {
       helper(handlebars, this.gameData)
