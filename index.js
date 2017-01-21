@@ -11,7 +11,8 @@ var Parser = function () {
     pagesOnly: false,
     header: '',
     footer: '',
-    helpers: []
+    helpers: [],
+    bundlePages: {}
   }
   this.steps = []
   this.helpers = []
@@ -143,6 +144,15 @@ Parser.prototype.run = function () {
     this.runStep(0, name, filename, function (name, filename) {
       fs.writeFileSync(path.join(this.config.outputDir, filename), this.config.header + this.pages[name] + this.config.footer)
     }.bind(this))
+  }
+  for(var key in this.config.bundlePages) {
+    var combined = this.config.header
+    var filename = key + '.' + this.config.outputExtension
+    this.config.bundlePages[key].forEach(function (page) {
+      combined += this.pages[page]
+    }.bind(this))
+    combined += this.config.footer
+    fs.writeFileSync(path.join(this.config.outputDir, filename), combined)
   }
 }
 

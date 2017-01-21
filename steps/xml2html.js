@@ -57,6 +57,16 @@ module.exports = function (content, name, config, done) {
         })
       }
 
+      if(config.anchorsFromText && config.anchorsFromText.length > 0) {
+        config.anchorsFromText.forEach(function (selector) {
+          $(selector).each(function (index, el) {
+            var a = window.document.createElement('a')
+            $(a).addClass('anchor-from-text').attr('id', slugify($(el).text(), {lower: true}))
+            $(el).prepend(a)
+          })
+        })
+      }
+
       //Get rid of the jQuery files jsdom inserts
       //It adds 3 for some reason
       $('script').each(function (i, el) {
