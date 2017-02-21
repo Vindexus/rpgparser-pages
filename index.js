@@ -138,6 +138,17 @@ Parser.prototype.run = function () {
     var template2 = handlebars.compile(template(this.gameData))
     this.pages[page] = template2(this.gameData)
   }.bind(this))
+
+  //Add the bundled pages to the main pages, concatenating the content
+  for(var key in this.config.bundlePages) {
+    var combined = ''
+    var filename = key + '.' + this.config.outputExtension
+    this.config.bundlePages[key].forEach(function (page) {
+      combined += this.pages[page]
+    }.bind(this))
+    this.pages[key] = combined
+  }
+
   for(var name in this.pages) {
     var basename = path.basename(name, path.extname(name))
     var filename =  basename + '.' + this.config.outputExtension
@@ -145,15 +156,7 @@ Parser.prototype.run = function () {
       fs.writeFileSync(path.join(this.config.outputDir, filename), this.config.header + this.pages[name] + this.config.footer)
     }.bind(this))
   }
-  for(var key in this.config.bundlePages) {
-    var combined = this.config.header
-    var filename = key + '.' + this.config.outputExtension
-    this.config.bundlePages[key].forEach(function (page) {
-      combined += this.pages[page]
-    }.bind(this))
-    combined += this.config.footer
-    fs.writeFileSync(path.join(this.config.outputDir, filename), combined)
-  }
+
 }
 
 module.exports = Parser
