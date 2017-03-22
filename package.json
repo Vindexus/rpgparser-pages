@@ -1,6 +1,6 @@
 {
   "name": "rpgparser-pages",
-  "version": "1.0.3",
+  "version": "1.1.0",
   "description": "Parse XML pages into multiple output types using your RPG game JSON data.",
   "main": "index.js",
   "scripts": {
