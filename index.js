@@ -9,6 +9,7 @@ var Parser = function () {
     debug: false,
     partialsDir: false,
     pagesOnly: false,
+    pagesAsPartials: false,
     header: '',
     footer: '',
     helpers: [],
@@ -80,12 +81,30 @@ Parser.prototype.getPartialFiles = function () {
 }
 
 Parser.prototype.registerPartials = function () {
-  var files = this.getPartialFiles()
-  if(!files) {
+  var mapFullPath = function (file, dir) {
+    return path.join(dir, file)
+  }
+
+  //Get the basic partials
+  var partialFiles = this.getPartialFiles()
+  var filePaths = partialFiles.map(function (file) {
+    return mapFullPath(file, this.config.partialsDir)
+  }.bind(this))
+
+  //Let's add the pages as partials, maybe
+  if(this.config.pagesAsPartials) {
+    var pageFiles = this.getPageFiles()
+    if(pageFiles.length > 0) {
+      var pagePaths = pageFiles.map(function (file) {
+        return mapFullPath(file, this.config.pagesDir)
+      }.bind(this))
+      filePaths = filePaths.concat(pagePaths)
+    }
+  }
+  if(!filePaths) {
     return false
   }
-  files.forEach(function (file) {
-    var filePath = path.join(this.config.partialsDir, file)
+  filePaths.forEach(function (filePath) {
     var name = path.basename(filePath, path.extname(filePath))
     handlebars.registerPartial(name, fs.readFileSync(filePath, 'utf8'))
   })  
