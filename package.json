@@ -9,6 +9,7 @@
   "author": "Vindexus",
   "license": "ISC",
   "dependencies": {
+    "argparse": "^1.0.9",
     "handlebars": "^4.0.5",
     "jsdom": "^9.9.1",
     "lodash": "^4.16.6",

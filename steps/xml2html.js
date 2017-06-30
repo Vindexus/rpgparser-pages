@@ -32,7 +32,6 @@ module.exports = function (content, name, config, done) {
         var newNode = window.document.createElement(newNodeName)
 
         $.each(elem.attributes, function() {
-          console.log(this.name, this.value);
           if(this.value !== undefined) {
             $(newNode).attr(this.name, this.value)
           }

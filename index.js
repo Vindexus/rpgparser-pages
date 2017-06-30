@@ -1,13 +1,15 @@
-var path          = require('path')
-var fs            = require('fs')
-var _             = require('lodash')
-var handlebars    = require('handlebars')
-var minimist      = require('minimist');
+var path              = require('path')
+var fs                = require('fs')
+var _                 = require('lodash')
+var handlebars        = require('handlebars')
+var async             = require('async');
+
+var args = {}; //TODO: These should be passed in from somewhere else. This file is no longer a command line thing.
 
 var Parser = function () {
   this.defaultConfig = {
     debug: false,
-    partialsDir: false,
+    partialsDirs: false,
     pagesOnly: false,
     pagesAsPartials: false,
     header: '',
@@ -15,8 +17,9 @@ var Parser = function () {
     helpers: [],
     bundlePages: {}
   }
-  this.steps = []
-  this.helpers = []
+  this.precompileSteps = []; //These are run on pages before they go through handlebars
+  this.steps = []; //These are run on pages AFTER they go through handlebars
+  this.helpers = [] //These are handlebars helpers
 }
 
 Parser.prototype.log = function() {
@@ -34,6 +37,13 @@ Parser.prototype.getPageFiles = function () {
     }
     return false
   }.bind(this))
+
+  if(this.config.pagesMatch) {
+    files = files.filter(function (file) {
+      var matches = file.match(new RegExp(this.config.pagesMatch))
+      return matches
+    }.bind(this))
+  }
 
   return files
 }
@@ -59,8 +69,29 @@ Parser.prototype.registerHelperFile = function (file) {
   require(file)(handlebars, this.gameData)
 }
 
+Parser.prototype.registerStartingStep = function (fn, config) {
+  this.steps.unshift({
+    fn: fn,
+    config: config
+  });
+}
+
 Parser.prototype.registerStep = function (fn, config) {
   this.steps.push({
+    fn: fn,
+    config: config
+  })
+}
+
+Parser.prototype.registerPrecompileStartingStep = function (fn, config) {
+  this.precompileSteps.unshift({
+    fn: fn,
+    config: config
+  });
+}
+
+Parser.prototype.registerPrecompileStep = function (fn, config) {
+  this.precompileSteps.push({
     fn: fn,
     config: config
   })
@@ -74,10 +105,18 @@ Parser.prototype.registerPackagedStep = function (stepName, config) {
 }
 
 Parser.prototype.getPartialFiles = function () {
-  if(!this.config.partialsDir) {
+  if(!this.config.partialsDirs) {
     return false
   }
-  return fs.readdirSync(this.config.partialsDir)
+  var files = []
+  this.config.partialsDirs.forEach(function (dir) {
+    var dirFiles = fs.readdirSync(dir)
+    dirFiles = dirFiles.map(function (filename) {
+      return path.join(dir, filename)
+    })
+    files = files.concat(dirFiles)
+  })
+  return files
 }
 
 Parser.prototype.registerPartials = function () {
@@ -87,9 +126,7 @@ Parser.prototype.registerPartials = function () {
 
   //Get the basic partials
   var partialFiles = this.getPartialFiles()
-  var filePaths = partialFiles.map(function (file) {
-    return mapFullPath(file, this.config.partialsDir)
-  }.bind(this))
+  var filePaths = partialFiles || [];
 
   //Let's add the pages as partials, maybe
   if(this.config.pagesAsPartials) {
@@ -121,42 +158,58 @@ Parser.prototype.init = function (config) {
 }
 
 Parser.prototype.processArgv = function () {
-  var args = minimist(process.argv.slice(2))
   if(args.files) {
     this.config.pagesOnly = args.files.split(",")
+  }
+  if(args.match) {
+    this.config.pagesMatch = args.match
   }
   if(args.debug) {
     this.config.debug = parseInt(args.debug) == 1
   }
 }
 
-//Runs a registered step, and continues to the next if it exits
-//When it's done with the last step it runs the doneSteps callback function
-Parser.prototype.runStep = function (i, name, filename, doneSteps) {
-  if(!this.steps[i]) {
-    doneSteps(name, filename)
-  }
-  this.steps[i].fn(this.pages[name], name, this.steps[i].config, function (content) {
-    this.pages[name] = content
-    if(i < this.steps.length - 1) {
-      this.runStep(i+1, name, filename, doneSteps)
-    }
-    else {
-      doneSteps(name, filename)
-    }
-  }.bind(this))
-}
-
 Parser.prototype.run = function () {
   this.processArgv()
   this.registerHelpers()
   this.registerPartials()
-  var pages = this.getPageFiles()
+  var pages = this.getPageFiles();
+  console.log('pages', pages);
+
+  //Load all page content from the files
   pages.forEach(function (page) {
-    var template = handlebars.compile(fs.readFileSync(path.join(this.config.pagesDir, page), 'utf8'))
+    this.pages[page] = fs.readFileSync(path.join(this.config.pagesDir, page), 'utf8')
+  }.bind(this));
+
+  //This are the steps that happen before the pages are run through handlebars
+  //This allows extensions to replace handlebars tags and helpers
+  //with their own. Ex: str.split('{{moves.').join('{{skills.')
+  console.log('precompileSteps', this.precompileSteps.length);
+  if(this.precompileSteps) {
+    pages.forEach(function (name) {
+      var content = this.pages[name];
+      //Go through all of the precompile steps that have been registered
+      async.eachSeries(this.precompileSteps, function (step, next) {
+        step.fn(content, name, step.config, function (newcontent) {
+          console.log('prrecompile step content is now ' + newcontent)
+          content = newcontent;
+          next();
+        }.bind(this));
+      }.bind(this), function (err) {
+        //Update the content of the page
+        this.pages[name] = content;
+      }.bind(this));
+    }.bind(this));
+  }
+
+  //Compile the pages
+  pages.forEach(function (page) {
+    console.log(this.pages[page]);
+    var template = handlebars.compile(this.pages[page]);
     var template2 = handlebars.compile(template(this.gameData))
     this.pages[page] = template2(this.gameData)
-  }.bind(this))
+  }.bind(this));
+
 
   //Add the bundled pages to the main pages, concatenating the content
   for(var key in this.config.bundlePages) {
@@ -168,13 +221,23 @@ Parser.prototype.run = function () {
     this.pages[key] = combined
   }
 
-  for(var name in this.pages) {
+  pages.forEach(function (name) {
     var basename = path.basename(name, path.extname(name))
     var filename =  basename + '.' + this.config.outputExtension
-    this.runStep(0, name, filename, function (name, filename) {
-      fs.writeFileSync(path.join(this.config.outputDir, filename), this.config.header + this.pages[name] + this.config.footer)
-    }.bind(this))
-  }
+    var content = this.pages[name];
+
+    //Go through all of the steps that have been registered
+    async.eachSeries(this.steps, function (step, next) {
+      step.fn(content, name, step.config, function (newcontent) {
+        content = newcontent;
+        next();
+      }.bind(this));
+    }.bind(this), function (err) {
+      console.log('done all the steps');
+      //When all of the steps are done we save the page
+      fs.writeFileSync(path.join(this.config.outputDir, filename), this.config.header + content + this.config.footer)
+    }.bind(this));
+  }.bind(this));
 
 }
 
