@@ -169,12 +169,11 @@ Parser.prototype.processArgv = function () {
   }
 }
 
-Parser.prototype.run = function () {
+Parser.prototype.run = function (done) {
   this.processArgv()
   this.registerHelpers()
   this.registerPartials()
   var pages = this.getPageFiles();
-  console.log('pages', pages);
 
   //Load all page content from the files
   pages.forEach(function (page) {
@@ -184,14 +183,12 @@ Parser.prototype.run = function () {
   //This are the steps that happen before the pages are run through handlebars
   //This allows extensions to replace handlebars tags and helpers
   //with their own. Ex: str.split('{{moves.').join('{{skills.')
-  console.log('precompileSteps', this.precompileSteps.length);
   if(this.precompileSteps) {
     pages.forEach(function (name) {
       var content = this.pages[name];
       //Go through all of the precompile steps that have been registered
       async.eachSeries(this.precompileSteps, function (step, next) {
         step.fn(content, name, step.config, function (newcontent) {
-          console.log('prrecompile step content is now ' + newcontent)
           content = newcontent;
           next();
         }.bind(this));
@@ -204,7 +201,6 @@ Parser.prototype.run = function () {
 
   //Compile the pages
   pages.forEach(function (page) {
-    console.log(this.pages[page]);
     var template = handlebars.compile(this.pages[page]);
     var template2 = handlebars.compile(template(this.gameData))
     this.pages[page] = template2(this.gameData)
@@ -221,23 +217,29 @@ Parser.prototype.run = function () {
     this.pages[key] = combined
   }
 
-  pages.forEach(function (name) {
+  async.each(pages, function (name, next) {
     var basename = path.basename(name, path.extname(name))
     var filename =  basename + '.' + this.config.outputExtension
     var content = this.pages[name];
 
     //Go through all of the steps that have been registered
-    async.eachSeries(this.steps, function (step, next) {
+    async.eachSeries(this.steps, function (step, next2) {
+
+      console.log('typeof(next2)',typeof(next2));
       step.fn(content, name, step.config, function (newcontent) {
         content = newcontent;
-        next();
+        next2();
       }.bind(this));
     }.bind(this), function (err) {
-      console.log('done all the steps');
       //When all of the steps are done we save the page
       fs.writeFileSync(path.join(this.config.outputDir, filename), this.config.header + content + this.config.footer)
+      next()
     }.bind(this));
-  }.bind(this));
+  }.bind(this), function () {
+    if(typeof(done) == 'function') {
+      done();
+    }
+  });
 
 }
 
