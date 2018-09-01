@@ -31,12 +31,20 @@ Parser.prototype.log = function() {
 Parser.prototype.getPageFiles = function () {
   var readDir = fs.readdirSync(this.config.pagesDir)
   var files = readDir.filter(function (file) {
+      console.log('file', file);
     var filename = path.basename(file)
+    if(fs.lstatSync(path.join(this.config.pagesDir, file)).isDirectory()) {
+      return false
+    }
+
     if(!this.config.pagesOnly || this.config.pagesOnly.indexOf(filename) >= 0) {
       return true
     }
+
     return false
   }.bind(this))
+
+  console.log('files',files);
 
   if(this.config.pagesMatch) {
     files = files.filter(function (file) {
@@ -177,7 +185,8 @@ Parser.prototype.run = function (done) {
 
   //Load all page content from the files
   pages.forEach(function (page) {
-    this.pages[page] = fs.readFileSync(path.join(this.config.pagesDir, page), 'utf8')
+    var pathStr = path.join(this.config.pagesDir, page);
+    this.pages[page] = fs.readFileSync(pathStr, 'utf8')
   }.bind(this));
 
   //This are the steps that happen before the pages are run through handlebars
@@ -224,8 +233,6 @@ Parser.prototype.run = function (done) {
 
     //Go through all of the steps that have been registered
     async.eachSeries(this.steps, function (step, next2) {
-
-      console.log('typeof(next2)',typeof(next2));
       step.fn(content, name, step.config, function (newcontent) {
         content = newcontent;
         next2();
